@@ -9,7 +9,6 @@ function getScheduleStatus() {
   var props = PropertiesService.getScriptProperties();
   var jobs = [
     { fn: 'sendDailyReport',             defaultHour: 7 },
-    { fn: 'sendDailyCalendar',           defaultHour: 7 },
     { fn: 'sendMissingTransactionAlert', defaultHour: 8 }
   ];
 

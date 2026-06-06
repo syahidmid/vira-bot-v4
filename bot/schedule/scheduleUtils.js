@@ -2,7 +2,7 @@
  * =============================================================================
  * bot/schedule/scheduleUtils.js
  * =============================================================================
- * Shared utilities for all scheduled jobs (dailyReport, dailyCalendar, etc.)
+ * Shared utilities for all scheduled jobs (dailyReport, missingTransactionAlert, etc.)
  * =============================================================================
  */
 
