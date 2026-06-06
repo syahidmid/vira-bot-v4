@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>sidebar-script</title>
+</head>
+
+<body>
+  <script>
+
+    /* ══════════════════════════════
+       UI HELPERS
+    ══════════════════════════════ */
+
+    function switchTab(id, el) {
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      document.querySelectorAll('.seg-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.getElementById('tab-' + id).classList.add('active');
+      el.classList.add('active');
+      if (id === 'schedule') loadScheduleStatus();
+    }
+
+    function toggleVis(id, btn) {
+      var inp = document.getElementById(id);
+      if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+      else { inp.type = 'password'; btn.textContent = '👁'; }
+    }
+
+    function toast(msg) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'show';
+      setTimeout(function () { t.className = ''; }, 3000);
+    }
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+
+    /* ══════════════════════════════
+       CONNECTION
+    ══════════════════════════════ */
+
+    function connect() {
+      var btn = document.getElementById('connectButton');
+      var telegramId = document.getElementById('telegramId').value.trim();
+      var deploymentId = document.getElementById('deploymentId').value.trim();
+      // Disconnect
+      if (btn.dataset.state === 'connected') {
+        btn.innerHTML = '<span class="spinner"></span>Memutuskan...';
+        btn.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (res) { toast(res); checkBotStatus(); })
+          .withFailureHandler(function (e) { toast('❌ ' + e.message); checkBotStatus(); })
+          .deleteWebhook();
+        return;
+      }
+
+      // Validate
+      if (!telegramId) { toast('⚠️ Masukkan Bot Token dulu'); return; }
+      if (!deploymentId) { toast('⚠️ Masukkan Deployment ID dulu'); return; }
+
+      btn.innerHTML = '<span class="spinner"></span>Menghubungkan...';
+      btn.disabled = true;
+
+      // Simpan ke Properties lalu setWebhook
+      google.script.run
+        .withSuccessHandler(function () {
+          google.script.run
+            .withSuccessHandler(function () {
+              google.script.run
+                .withSuccessHandler(function (res) { toast(res); checkBotStatus(); })
+                .withFailureHandler(function (e) { toast('❌ setWebhook: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+                .setWebhook(telegramId, deploymentId);
+            })
+            .withFailureHandler(function (e) { toast('❌ saveDeployment: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+            .saveValue('DEPLOYMENT_ID', deploymentId);
+        })
+        .withFailureHandler(function (e) { toast('❌ saveTelegram: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+        .saveValue('TELEGRAM_BOT_TOKEN', telegramId);
+    }
+
+    function checkBotStatus() {
+      google.script.run.withSuccessHandler(function (status) {
+        var pill = document.getElementById('statusPill');
+        var txtEl = document.getElementById('statusText');
+        var btn = document.getElementById('connectButton');
+        var infoSt = document.getElementById('infoStatus');
+
+        btn.disabled = false;
+
+        if (status === 'Connected') {
+          pill.className = 'status-pill connected';
+          txtEl.textContent = 'Online';
+          btn.className = 'btn-full btn-danger';
+          btn.innerHTML = 'Putuskan Koneksi';
+          btn.dataset.state = 'connected';
+          infoSt.textContent = '🟢 Bot aktif & berjalan';
+        } else {
+          pill.className = 'status-pill disconnected';
+          txtEl.textContent = 'Offline';
+          btn.className = 'btn-full btn-primary';
+          btn.innerHTML = 'Hubungkan';
+          btn.dataset.state = '';
+          infoSt.textContent = '🔴 Bot belum terhubung';
+        }
+      }).getBotStatus();
+    }
+
+    function loadStoredValues() {
+      google.script.run.withSuccessHandler(function (v) {
+        document.getElementById('telegramId').value = v.telegramId || '';
+        document.getElementById('deploymentId').value = v.deploymentId || '';
+        document.getElementById('ownerChatId').value = '';  // owner ID not stored
+      }).getBotAndDeploymentIds();
+    }
+
+
+    function checkAiStatus() {
+      google.script.run.withSuccessHandler(function (res) {
+        var badge = document.getElementById('aiStatusBadge');
+        var txt = document.getElementById('aiStatusText');
+        var infoAi = document.getElementById('aiStatus');
+        var infoAiSub = document.getElementById('aiSubStatus');
+        var iconWrap = document.getElementById('aiIconWrap');
+
+        if (res && res.active) {
+          badge.className = 'ai-status-badge active';
+          txt.textContent = 'Aktif';
+          infoAi.textContent = '✦ AI aktif (' + res.provider + ')';
+          infoAiSub.textContent = res.model || 'Model default';
+          iconWrap.style.background = '#e8f8ed';
+        } else {
+          badge.className = 'ai-status-badge inactive';
+          txt.textContent = 'Tidak Aktif';
+          infoAi.textContent = 'AI tidak aktif';
+          infoAiSub.textContent = 'Tambah API key di tab AI';
+          iconWrap.style.background = '#f2f2f7';
+        }
+
+        // Tandai provider card mana yang sudah punya key
+        if (res && res.providers) {
+          var icons = { gemini: 0, openai: 1, groq: 2 };
+          Object.keys(res.providers).forEach(function (p) {
+            var cards = document.querySelectorAll('.provider-card');
+            if (res.providers[p]) {
+              cards[icons[p]].style.opacity = '1';
+              cards[icons[p]].querySelector('.p-name').textContent =
+                p.charAt(0).toUpperCase() + p.slice(1) + ' ✓';
+            }
+          });
+
+          // Set active provider
+          if (res.provider) {
+            document.querySelectorAll('.provider-card').forEach(function (c) {
+              c.classList.remove('selected');
+            });
+            var idx = icons[res.provider.toLowerCase()];
+            if (idx !== undefined) {
+              document.querySelectorAll('.provider-card')[idx].classList.add('selected');
+              selectedProvider = res.provider.toLowerCase();
+            }
+          }
+        }
+      }).getAiStatus();
+    }
+
+
+    /* ══════════════════════════════
+       USERS
+    ══════════════════════════════ */
+
+    function renderUsers(users) {
+      var list = document.getElementById('userList');
+
+      if (!users || users.length === 0) {
+        list.innerHTML =
+          '<div class="empty-state">' +
+          '<div class="icon">👤</div>' +
+          '<div class="title">Belum ada user</div>' +
+          '<div class="sub">Tambah Chat ID di bawah</div>' +
+          '</div>';
+        return;
+      }
+
+      list.innerHTML = users.map(function (u) {
+        var initial = u.name ? u.name.charAt(0).toUpperCase() : '#';
+        var label = u.name || '—';
+        return (
+          '<div class="user-row">' +
+          '<div class="user-avatar">' + initial + '</div>' +
+          '<div class="user-info">' +
+          '<div class="user-name">' + esc(label) + '</div>' +
+          '<div class="user-chatid">' + esc(u.chatId) + '</div>' +
+          '</div>' +
+          '<button class="remove-btn" ' +
+          'onclick="removeUser(\'' + esc(u.chatId) + '\',\'' + esc(label) + '\')" ' +
+          'title="Hapus">✕</button>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function loadUsers() {
+      google.script.run.withSuccessHandler(renderUsers).getUsers();
+    }
+
+    function addUser() {
+      var name = document.getElementById('newUserName').value.trim();
+      var chatId = document.getElementById('newUserChatId').value.trim();
+
+      if (!chatId) { toast('⚠️ Chat ID tidak boleh kosong'); return; }
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res.success) {
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserChatId').value = '';
+            toast(res.message);
+            loadUsers();
+          } else {
+            toast(res.message);
+          }
+        })
+        .addUser(name, chatId);
+    }
+
+    function removeUser(chatId, name) {
+      if (!confirm('Hapus "' + name + '"?')) return;
+      google.script.run
+        .withSuccessHandler(function (res) { toast(res.message); loadUsers(); })
+        .removeUser(chatId);
+    }
+
+
+    /* ══════════════════════════════
+       SCHEDULE
+    ══════════════════════════════ */
+
+    var SCHEDULE_JOBS = [
+      { fn: 'sendDailyReport',             icon: '📊', name: 'Daily Report',              desc: 'Ringkasan pengeluaran kemarin' },
+      { fn: 'sendDailyCalendar',           icon: '📅', name: 'Daily Calendar',             desc: 'Agenda Google Calendar hari ini' },
+      { fn: 'sendMissingTransactionAlert', icon: '⚠️', name: 'Missing Transaction Alert',  desc: 'Reminder jika kemarin tidak ada transaksi' }
+    ];
+
+    function loadScheduleStatus() {
+      var list = document.getElementById('scheduleList');
+      list.innerHTML =
+        '<div class="empty-state"><div class="icon">⏳</div><div class="title">Memuat...</div></div>';
+      google.script.run
+        .withSuccessHandler(renderScheduleJobs)
+        .withFailureHandler(function (e) {
+          document.getElementById('scheduleList').innerHTML =
+            '<div class="empty-state"><div class="icon">⚠️</div><div class="title">Gagal memuat</div><div class="sub">' + esc(e.message) + '</div></div>';
+        })
+        .getScheduleStatus();
+    }
+
+    function renderScheduleJobs(statuses) {
+      var list = document.getElementById('scheduleList');
+      if (!statuses || statuses.length === 0) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">⏰</div><div class="title">Tidak ada jadwal</div></div>';
+        return;
+      }
+
+      var statusMap = {};
+      statuses.forEach(function (s) { statusMap[s.fn] = s; });
+
+      list.innerHTML = SCHEDULE_JOBS.map(function (job) {
+        var s = statusMap[job.fn] || { active: false, hour: 7 };
+        var options = '';
+        for (var h = 0; h < 24; h++) {
+          var hh = h < 10 ? '0' + h : '' + h;
+          options += '<option value="' + h + '"' + (s.hour === h ? ' selected' : '') + '>' + hh + ':00</option>';
+        }
+        return (
+          '<div class="schedule-job">' +
+            '<div class="job-header">' +
+              '<div class="job-info">' +
+                '<div class="job-name">' + job.icon + ' ' + esc(job.name) + '</div>' +
+                '<div class="job-desc">' + esc(job.desc) + '</div>' +
+              '</div>' +
+              '<label class="toggle">' +
+                '<input type="checkbox" id="toggle-' + job.fn + '"' + (s.active ? ' checked' : '') + '>' +
+                '<span class="toggle-slider"></span>' +
+              '</label>' +
+            '</div>' +
+            '<div class="job-footer">' +
+              '<div class="job-time-row">' +
+                '<span class="time-label">Jam kirim</span>' +
+                '<select class="hour-select" id="hour-' + job.fn + '">' + options + '</select>' +
+              '</div>' +
+              '<button class="btn-sm" onclick="saveSchedule(\'' + job.fn + '\')">Simpan</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function saveSchedule(fnName) {
+      var isActive = document.getElementById('toggle-' + fnName).checked;
+      var hour = parseInt(document.getElementById('hour-' + fnName).value, 10);
+      var hh = hour < 10 ? '0' + hour : '' + hour;
+
+      if (!isActive) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res.success) { toast('⏸ Jadwal dinonaktifkan'); loadScheduleStatus(); }
+            else { toast('❌ ' + res.message); }
+          })
+          .deleteScheduleTrigger(fnName);
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res.success) { toast('✅ Aktif, kirim jam ' + hh + ':00 setiap hari'); loadScheduleStatus(); }
+          else { toast('❌ ' + res.message); }
+        })
+        .setScheduleTrigger(fnName, hour);
+    }
+
+
+    /* ══════════════════════════════
+       INIT
+    ══════════════════════════════ */
+
+    window.onload = function () {
+      loadStoredValues();
+      checkBotStatus();
+      loadUsers();
+    };
+
+  </script>
+</body>
+
+</html>
