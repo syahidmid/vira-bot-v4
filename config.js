@@ -268,29 +268,7 @@ function setDefaultProvider(provider) {
 }
 
 
-// ═══════════════════════════════════════════════
-//  OPEN SIDEBAR
-// ═══════════════════════════════════════════════
-
-/**
- * Dipakai oleh <?!= include('nama-file') ?> di HTML
- * supaya CSS dan JS bisa dipisah ke file berbeda
- */
+// include() digunakan oleh template HTML (<?!= include('nama-file') ?>)
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-function openSidebar() {
-  var html = HtmlService.createTemplateFromFile('sidebar')
-    .evaluate()
-    .setTitle('Vira Bot')
-    .setWidth(320);
-  SpreadsheetApp.getUi().showSidebar(html);
-}
-
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('👩🏻‍💼 Vira Bot V3')
-    .addItem('⚙️ Settings', 'openSidebar')
-    .addToUi();
 }
