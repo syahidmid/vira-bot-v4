@@ -49,6 +49,8 @@
       var btn = document.getElementById('connectButton');
       var telegramId = document.getElementById('telegramId').value.trim();
       var deploymentId = document.getElementById('deploymentId').value.trim();
+      var spreadsheetId = document.getElementById('spreadsheetId').value.trim();
+
       // Disconnect
       if (btn.dataset.state === 'connected') {
         btn.innerHTML = '<span class="spinner"></span>Memutuskan...';
@@ -63,19 +65,25 @@
       // Validate
       if (!telegramId) { toast('⚠️ Masukkan Bot Token dulu'); return; }
       if (!deploymentId) { toast('⚠️ Masukkan Deployment ID dulu'); return; }
+      if (!spreadsheetId) { toast('⚠️ Masukkan Spreadsheet ID dulu'); return; }
 
       btn.innerHTML = '<span class="spinner"></span>Menghubungkan...';
       btn.disabled = true;
 
-      // Simpan ke Properties lalu setWebhook
+      // Simpan semua lalu setWebhook
       google.script.run
         .withSuccessHandler(function () {
           google.script.run
             .withSuccessHandler(function () {
               google.script.run
-                .withSuccessHandler(function (res) { toast(res); checkBotStatus(); })
-                .withFailureHandler(function (e) { toast('❌ setWebhook: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
-                .setWebhook(telegramId, deploymentId);
+                .withSuccessHandler(function () {
+                  google.script.run
+                    .withSuccessHandler(function (res) { toast(res); checkBotStatus(); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+                    .withFailureHandler(function (e) { toast('❌ setWebhook: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+                    .setWebhook(telegramId, deploymentId);
+                })
+                .withFailureHandler(function (e) { toast('❌ saveSpreadsheet: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
+                .saveValue('SPREADSHEET_ID', spreadsheetId);
             })
             .withFailureHandler(function (e) { toast('❌ saveDeployment: ' + e.message); btn.disabled = false; btn.innerHTML = 'Hubungkan'; })
             .saveValue('DEPLOYMENT_ID', deploymentId);
@@ -115,7 +123,7 @@
       google.script.run.withSuccessHandler(function (v) {
         document.getElementById('telegramId').value = v.telegramId || '';
         document.getElementById('deploymentId').value = v.deploymentId || '';
-        document.getElementById('ownerChatId').value = '';  // owner ID not stored
+        document.getElementById('spreadsheetId').value = v.spreadsheetId || '';
       }).getBotAndDeploymentIds();
     }
 

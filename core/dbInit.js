@@ -1,10 +1,14 @@
 
 // Inisialisasi database menggunakan miniSheetDB2
 
-const VIRA_SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+function getSpreadsheetId() {
+  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (!id) throw new Error('SPREADSHEET_ID belum diset di Script Properties.');
+  return id;
+}
 
 function getDbTransactions() {
-  return new miniSheetDB2.init(VIRA_SPREADSHEET_ID, "Transactions", {
+  return new miniSheetDB2.init(getSpreadsheetId(), "Transactions", {
     col_length: 9,
     row_start: 2,
     col_start: 1,
@@ -13,7 +17,7 @@ function getDbTransactions() {
 }
 
 function getDbCatAndTag() {
-  return new miniSheetDB2.init(VIRA_SPREADSHEET_ID, "Query", {
+  return new miniSheetDB2.init(getSpreadsheetId(), "Query", {
     col_length: 5,
     col_start: 1,
     row_start: 2,

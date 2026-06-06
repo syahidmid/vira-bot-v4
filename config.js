@@ -1,10 +1,20 @@
 // ═══════════════════════════════════════════════
 //  CONFIG SHEET UTILITIES
-//  Semua data disimpan di sheet tersembunyi "_config"
-//  supaya ikut ter-copy saat spreadsheet di-duplicate
+//  Semua data disimpan di sheet "_config"
 // ═══════════════════════════════════════════════
 
-
+function getConfigSheet() {
+  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (!id) throw new Error('SPREADSHEET_ID belum diset di Script Properties.');
+  var ss = SpreadsheetApp.openById(id);
+  var sheet = ss.getSheetByName('_config');
+  if (!sheet) {
+    sheet = ss.insertSheet('_config');
+    sheet.appendRow(['key', 'value']);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
 
 /**
  * Simpan nilai berdasarkan key
@@ -57,7 +67,7 @@ function deleteFromSheet(key) {
 // ═══════════════════════════════════════════════
 
 function saveValue(key, value) {
-  if (key === 'TELEGRAM_BOT_TOKEN' || key === 'DEPLOYMENT_ID') {
+  if (key === 'TELEGRAM_BOT_TOKEN' || key === 'DEPLOYMENT_ID' || key === 'SPREADSHEET_ID') {
     PropertiesService.getScriptProperties().setProperty(key, value);
   } else {
     saveToSheet(key, value);
@@ -65,7 +75,7 @@ function saveValue(key, value) {
 }
 
 function getValue(key) {
-  if (key === 'TELEGRAM_BOT_TOKEN' || key === 'DEPLOYMENT_ID') {
+  if (key === 'TELEGRAM_BOT_TOKEN' || key === 'DEPLOYMENT_ID' || key === 'SPREADSHEET_ID') {
     return PropertiesService.getScriptProperties().getProperty(key) || '';
   }
   return getFromSheet(key);
@@ -76,7 +86,8 @@ function getBotAndDeploymentIds() {
   const props = PropertiesService.getScriptProperties();
   return {
     telegramId: props.getProperty('TELEGRAM_BOT_TOKEN') || '',
-    deploymentId: props.getProperty('DEPLOYMENT_ID') || ''
+    deploymentId: props.getProperty('DEPLOYMENT_ID') || '',
+    spreadsheetId: props.getProperty('SPREADSHEET_ID') || ''
   };
 }
 
